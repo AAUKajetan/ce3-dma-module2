@@ -11,7 +11,9 @@ MODULE = os.environ["MODULE_NUMBER"]
 MONOREPO = Path(os.environ["MONOREPO_CHECKOUT"])
 HERE = Path(__file__).resolve().parent.parent
 
-SKIP_TOP = {"README.md", ".git", ".github"}
+SKIP_TOP = {"README.md", ".git", ".github", "tools"}
+# "tools" holds only this generated script itself — sync_back.py must never
+# map its own file back onto the monorepo as if it were course content.
 
 
 def tracked_files():
