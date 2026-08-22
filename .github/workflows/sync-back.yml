@@ -1,0 +1,68 @@
+name: Sync back to the course
+
+# Reverse of publish-modules.yml on the monorepo: a push here (Codespaces or
+# anywhere) opens a pull request against the monorepo with the equivalent
+# change, mapped onto Module 2/exercises and Module 2/notebook by
+# tools/sync_back.py. Never pushes directly to the monorepo's master and never
+# deletes there — see that script for why.
+#
+# Skips pushes authored by the publishing bot itself, so content that just
+# arrived FROM the monorepo does not bounce straight back as a pointless PR.
+#
+# One-time setup this depends on: a repository secret named MONOREPO_PAT, a
+# token with Contents and Pull requests write access to the monorepo.
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  sync-back:
+    if: github.event.head_commit.author.email != 'actions@users.noreply.github.com'
+    runs-on: ubuntu-latest
+    env:
+      MODULE_NUMBER: "2"
+    steps:
+      - name: Check out this module
+        uses: actions/checkout@v6
+
+      - name: Check out the course
+        uses: actions/checkout@v6
+        with:
+          repository: byvalentino/AAU---Data-Mining-and-Analysis---CE3
+          token: ${{ secrets.MONOREPO_PAT }}
+          path: course
+
+      - name: Map the change back
+        env:
+          MONOREPO_CHECKOUT: ${{ github.workspace }}/course
+          CHANGED_COUNT_FILE: /tmp/changed_count
+        run: python3 tools/sync_back.py
+
+      - name: Open the pull request
+        env:
+          GH_TOKEN: ${{ secrets.MONOREPO_PAT }}
+        run: |
+          count=$(cat /tmp/changed_count)
+          if [ "$count" -eq 0 ]; then
+            echo "Nothing to sync back."
+            exit 0
+          fi
+          src_sha=$(git rev-parse --short HEAD)
+          src_msg=$(git log -1 --format=%s)
+          cd course
+          branch="sync/module-2-$src_sha"
+          git config user.name  "Module 2 sync-back"
+          git config user.email "actions@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add "Module 2"
+          git commit -m "Module 2: sync from module repo commit $src_sha
+
+          $src_msg
+
+          Source: https://github.com/byvalentino/AAU---Data-Mining-and-Analysis---CE3---Module-2/commit/$(git -C .. rev-parse HEAD)"
+          git push -u origin "$branch"
+          gh pr create --repo byvalentino/AAU---Data-Mining-and-Analysis---CE3 \
+            --base master --head "$branch" \
+            --title "Module 2: sync from module repo ($src_sha)" \
+            --body "Opened automatically by the module repository's sync-back workflow. Review, then merge — merging will re-trigger the forward publish, and this content will show as already in sync on the next run."
