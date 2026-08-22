@@ -1,0 +1,64 @@
+{
+ "_provenance": "Aggregates from Module 2/slides/measure.py run on data/bus.csv and data/passengers.csv, 16 August 2026. No row of the archive is here.",
+ "phones_per_day": {
+  "2020-01-22": 12,
+  "2020-01-23": 8
+ },
+ "phone_interval_s": 0.993,
+ "bus_interval_s": 0.5,
+ "beacon_absent_share": {
+  "rssiA": 86.3,
+  "rssiB": 73.2,
+  "rssiC": 70.7,
+  "rssi1": 57.0,
+  "rssi2": 83.8
+ },
+ "proximity_values": {
+  "-1": 43682,
+  "2": 3687,
+  "3": 2892,
+  "1": 340
+ },
+ "label2_balance": {
+  "IN": 7723,
+  "OUT": 6000
+ },
+ "busid_absent_share": 84.74,
+ "label_detail": {
+  "Bus 2": 4631,
+  "Stop C": 3477,
+  "Bus 1": 3092,
+  "Stop B": 1345,
+  "Walk": 736,
+  "Stop A": 442
+ },
+ "join_match_rate": {
+  "1": 95.3,
+  "2": 95.4,
+  "5": 95.7,
+  "10": 96.1,
+  "30": 97.4
+ },
+ "beacon_heard_when_aboard": {
+  "rssiA": 4.2,
+  "rssiB": 3.1,
+  "rssiC": 30.4,
+  "rssi1": 8.8,
+  "rssi2": 25.6
+ },
+ "beacon_heard_when_not_aboard": {
+  "rssiA": 6.7,
+  "rssiB": 4.2,
+  "rssiC": 31.1,
+  "rssi1": 14.4,
+  "rssi2": 24.4
+ },
+ "aboard_share_of_labelled": 56.3,
+ "beacon_agreement_with_aboard": {
+  "rssiA": 43.2,
+  "rssiB": 43.6,
+  "rssiC": 47.2,
+  "rssi1": 42.4,
+  "rssi2": 47.5
+ }
+}

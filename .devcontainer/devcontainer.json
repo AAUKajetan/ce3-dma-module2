@@ -1,0 +1,11 @@
+{
+  "name": "CE3 Module 2 — Cleaning data and building features",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "postCreateCommand": "bash setup.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python"],
+      "settings": {"python.defaultInterpreterPath": "/usr/local/bin/python"}
+    }
+  }
+}

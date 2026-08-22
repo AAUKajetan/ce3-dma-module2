@@ -1,0 +1,165 @@
+{
+ "columns": {
+  "battery_level": {
+   "max_missing_share": 0.010021,
+   "maximum": 92.05,
+   "minimum": 46.95,
+   "type": "number",
+   "unit": "per cent"
+  },
+  "door_state": {
+   "max_missing_share": 0.01,
+   "maximum": null,
+   "minimum": null,
+   "type": "text",
+   "unit": null
+  },
+  "emergency_stop": {
+   "max_missing_share": 0.48426,
+   "maximum": null,
+   "minimum": null,
+   "type": "text",
+   "unit": null
+  },
+  "inside_temperature": {
+   "max_missing_share": 0.01,
+   "maximum": 51.8,
+   "minimum": -9.8,
+   "type": "number",
+   "unit": "degrees Celsius"
+  },
+  "lat": {
+   "max_missing_share": 0.01,
+   "maximum": 55.792912,
+   "minimum": 55.792252,
+   "type": "number",
+   "unit": "degrees north"
+  },
+  "local_time": {
+   "max_missing_share": 0.01,
+   "maximum": null,
+   "minimum": null,
+   "type": "text",
+   "unit": null
+  },
+  "lon": {
+   "max_missing_share": 0.01,
+   "maximum": 12.524236,
+   "minimum": 12.522726,
+   "type": "number",
+   "unit": "degrees east"
+  },
+  "mileage": {
+   "max_missing_share": 0.01,
+   "maximum": 68811.75,
+   "minimum": -3276.75,
+   "type": "number",
+   "unit": null
+  },
+  "mode": {
+   "max_missing_share": 0.01,
+   "maximum": null,
+   "minimum": null,
+   "type": "text",
+   "unit": null
+  },
+  "outside_temperature": {
+   "max_missing_share": 0.01,
+   "maximum": 10.35,
+   "minimum": 2.65,
+   "type": "number",
+   "unit": "degrees Celsius"
+  },
+  "payload": {
+   "max_missing_share": 0.01,
+   "maximum": 684.6,
+   "minimum": -32.6,
+   "type": "number",
+   "unit": null
+  },
+  "platform": {
+   "max_missing_share": 0.010186,
+   "maximum": null,
+   "minimum": null,
+   "type": "text",
+   "unit": null
+  },
+  "ramp_state": {
+   "max_missing_share": 0.01,
+   "maximum": null,
+   "minimum": null,
+   "type": "text",
+   "unit": null
+  },
+  "speed": {
+   "max_missing_share": 0.01,
+   "maximum": 3.9008,
+   "minimum": -3.7068,
+   "type": "number",
+   "unit": "metres per second"
+  },
+  "state": {
+   "max_missing_share": 0.01,
+   "maximum": null,
+   "minimum": null,
+   "type": "text",
+   "unit": null
+  },
+  "theta": {
+   "max_missing_share": 0.01,
+   "maximum": 3.455154,
+   "minimum": -3.454784,
+   "type": "number",
+   "unit": "radians"
+  },
+  "timestamp": {
+   "max_missing_share": 0.01,
+   "maximum": null,
+   "minimum": null,
+   "type": "text",
+   "unit": null
+  },
+  "tz": {
+   "max_missing_share": 0.01,
+   "maximum": null,
+   "minimum": null,
+   "type": "text",
+   "unit": null
+  },
+  "utc_time": {
+   "max_missing_share": 0.01,
+   "maximum": null,
+   "minimum": null,
+   "type": "text",
+   "unit": null
+  },
+  "vehicle_id": {
+   "max_missing_share": 0.01,
+   "maximum": null,
+   "minimum": null,
+   "type": "text",
+   "unit": null
+  },
+  "x_web": {
+   "max_missing_share": 0.01,
+   "maximum": 1394191.531091,
+   "minimum": 1394023.463285,
+   "type": "number",
+   "unit": "metres, Web Mercator"
+  },
+  "y_web": {
+   "max_missing_share": 0.01,
+   "maximum": 7517300.348194,
+   "minimum": 7517169.501044,
+   "type": "number",
+   "unit": "metres, Web Mercator"
+  }
+ },
+ "dataset": "exercises/data/bus_slice.csv.gz",
+ "expected_step_seconds": 0.5,
+ "module": 1,
+ "rows": 48290,
+ "schema": "aau-ce3/data-profile/1",
+ "step_tolerance_share": 0.25,
+ "time_column": "utc_time"
+}

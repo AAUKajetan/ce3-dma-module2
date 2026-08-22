@@ -1,0 +1,38 @@
+name: checks
+
+on: [push, pull_request]
+
+jobs:
+  # The student state. Every check must exit 2 -- not merely non-zero, which a
+  # crash also satisfies -- and must name the lab it belongs to.
+  unsolved:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - run: bash setup.sh
+      - run: python3 verify/check_00_data.py
+      - name: every check exits 2 and names its own lab
+        run: |
+          for n in 01 02 03 04; do
+            # GitHub runs this block under `bash -e`, where `out=$(...)` takes the
+            # check's own exit status -- so the step died the moment a check
+            # correctly exited 2, which is the state this job exists to prove.
+            # An `if` condition is exempt from errexit; the else branch keeps the code.
+            if out=$(python3 verify/check_$n.py 2>&1); then code=0; else code=$?; fi
+            echo "$out"
+            [ "$code" -eq 2 ] || { echo "check_$n exited $code, expected 2"; exit 1; }
+            echo "$out" | grep -q "Lab ${n#0}" || { echo "check_$n did not name Lab ${n#0}"; exit 1; }
+          done
+
+  # The solved state. Applying the shipped solutions must turn every check green.
+  solved:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - run: bash setup.sh
+      - run: python3 apply.py
+      - run: make check0 && make check1 && make check2 && make check3 && make check4

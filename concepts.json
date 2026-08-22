@@ -1,0 +1,175 @@
+{
+ "module": 2,
+ "concepts": [
+  {
+   "id": "tumbling_window",
+   "name": "a tumbling window on the coordinated universal time grain",
+   "slide": "Definition — a tumbling window on the coordinated universal time grain",
+   "formula": "w_j = [t_0 + j·Δ, t_0 + (j+1)·Δ), Δ = 5 s, t_0 = 00:00:00 in coordinated universal time, from utc_time",
+   "citation": "Akidau et al. (2015)",
+   "lab": 1,
+   "function": "align",
+   "check": "verify/check_01.py"
+  },
+  {
+   "id": "conservation_ledger",
+   "name": "the conservation ledger",
+   "slide": "Definition — the conservation ledger",
+   "formula": "used + dropped = received, with Σ_reason drop_reasons[reason] = dropped",
+   "citation": "Wang & Strong (1996)",
+   "lab": 1,
+   "function": "align",
+   "check": "verify/check_01.py"
+  },
+  {
+   "id": "upstream_profile",
+   "name": "the upstream profile, and checking a frame against it",
+   "slide": "Definition — the upstream profile, and checking a frame against it",
+   "formula": "breaches(X, P) = the complaints P makes about X, over presence, type, range, tolerated absence and sampling step, in that order; X arrives fit for use exactly when breaches(X, P) is empty",
+   "citation": "Wang & Strong (1996)",
+   "lab": 1,
+   "function": "align",
+   "check": "verify/check_01.py"
+  },
+  {
+   "id": "simpson_paradox",
+   "name": "Simpson's paradox",
+   "slide": "Definition — Simpson's paradox",
+   "formula": "P(Y|D=1) > P(Y|D=0) while P(Y|D=1,G=g) < P(Y|D=0,G=g) for every group g",
+   "citation": "Simpson (1951)",
+   "lab": 1,
+   "function": "pooled_versus_by_group",
+   "check": "verify/check_01.py"
+  },
+  {
+   "id": "missing_mechanism",
+   "name": "the three missing-data mechanisms",
+   "slide": "Definition — the three missing-data mechanisms",
+   "formula": "MCAR: P(M | Y_obs, Y_mis) = P(M); MAR: P(M | Y_obs, Y_mis) = P(M | Y_obs); MNAR: neither",
+   "citation": "Rubin (1976); Little & Rubin (2019)",
+   "lab": 2,
+   "function": "fills_are_biased_which_way",
+   "check": "verify/check_02.py"
+  },
+  {
+   "id": "absence_mask",
+   "name": "the absence mask, over both encodings",
+   "slide": "Definition — the absence mask and the masked exponential moving average",
+   "formula": "m_t = 1 when rssi_t is null or prox_t = −1, else 0",
+   "citation": "van Buuren (2018)",
+   "lab": 2,
+   "function": "impute_with_mask",
+   "check": "verify/check_02.py"
+  },
+  {
+   "id": "masked_ema",
+   "name": "the masked exponential moving average",
+   "slide": "Definition — the absence mask and the masked exponential moving average",
+   "formula": "s_t = α·x_t + (1−α)·s_{t−1} over the heard readings only, α = 0.3, carried forward across a gap",
+   "citation": "Servizi et al. (2023)",
+   "lab": 2,
+   "function": "impute_with_mask",
+   "check": "verify/check_02.py"
+  },
+  {
+   "id": "imputation_bias",
+   "name": "imputation bias",
+   "slide": "Definition — imputation bias",
+   "formula": "bias = (1/|F|) Σ_{t ∈ F} (fill_t − truth_t), F the rows the method filled, in decibels",
+   "citation": "Little & Rubin (2019); van Buuren (2018)",
+   "lab": 2,
+   "function": "imputation_bias",
+   "check": "verify/check_02.py"
+  },
+  {
+   "id": "fitted_transform",
+   "name": "a fitted transform",
+   "slide": "Definition — the fitted transform, and applying it",
+   "formula": "θ = fit(X_train) = (median_j, μ_j, σ_j, column order), σ_j = √( (1/n) Σ_i (x_ij − μ_j)² ), ddof = 0",
+   "citation": "Kuhn & Johnson (2019), ch. 8",
+   "lab": 3,
+   "function": "fit_preprocessing",
+   "check": "verify/check_03.py"
+  },
+  {
+   "id": "applied_transform",
+   "name": "applying a fitted transform",
+   "slide": "Definition — the fitted transform, and applying it",
+   "formula": "apply(X, θ)_ij = (fill(x_ij, median_j) − μ_j) / σ_j, columns in the stored order",
+   "citation": "Kuhn & Johnson (2019), ch. 8",
+   "lab": 3,
+   "function": "apply_preprocessing",
+   "check": "verify/check_03.py"
+  },
+  {
+   "id": "target_leakage",
+   "name": "target leakage, and the ninety-nine per cent rule",
+   "slide": "Definition — target leakage, and the rule that catches it here",
+   "formula": "column c leaks when agreement(c) ≥ 0.99, or purity(c) ≥ 0.99 with |values(c)| ≤ 10, where agreement(c) = max( mean(1[c present] = 1[Y = IN]), mean(1[c present] ≠ 1[Y = IN]) ) and purity(c) = Σ_v max_y n(v, y) / n",
+   "citation": "Kaufman et al. (2012); Kapoor & Narayanan (2023)",
+   "lab": 3,
+   "function": "find_leaks",
+   "check": "verify/check_03.py"
+  },
+  {
+   "id": "feature_verdict",
+   "name": "the verdict on a candidate feature",
+   "slide": "Definition — the verdict on a candidate feature",
+   "formula": "verdict: E → {keep, keep with the mask, drop}, a total function of the six measured quantities alone, with reason ⊆ E: every number in the reason is a value in E",
+   "citation": "Kaufman et al. (2012); Kapoor & Narayanan (2023)",
+   "lab": 3,
+   "function": "keep_or_drop",
+   "check": "verify/check_03.py"
+  },
+  {
+   "id": "window_features",
+   "name": "the six window features",
+   "slide": "Definition — the six window features",
+   "formula": "over the last w readings: x̄, σ with ddof = 0, min, max, slope b = Σ_i (i − ī)(x_i − x̄) / Σ_i (i − ī)², and r_1",
+   "citation": "Kuhn & Johnson (2019), ch. 5",
+   "lab": 4,
+   "function": "window_features",
+   "check": "verify/check_04.py"
+  },
+  {
+   "id": "autocorrelation",
+   "name": "lag-k sample autocorrelation",
+   "slide": "Definition — lag-k sample autocorrelation",
+   "formula": "r_k = Σ_{t=k+1}^{n} (x_t − x̄)(x_{t−k} − x̄) / Σ_{t=1}^{n} (x_t − x̄)²",
+   "citation": "Box, Jenkins, Reinsel & Ljung (2015), §2.1.4",
+   "lab": 4,
+   "function": "window_features",
+   "check": "verify/check_04.py"
+  },
+  {
+   "id": "split_by_time",
+   "name": "a split by time",
+   "slide": "Definition — a split by time, never at random",
+   "formula": "train = {x_t : t < t_c}, test = {x_t : t ≥ t_c} for one cut instant t_c, the ⌊f·n⌋-th time in sorted order — never a random permutation of the rows",
+   "citation": "Roberts et al. (2017); Bergmeir & Benítez (2012)",
+   "lab": 4,
+   "function": "split_by_time",
+   "check": "verify/check_04.py"
+  },
+  {
+   "id": "tolerance_join",
+   "name": "a nearest match within a tolerance",
+   "slide": "Definition — a nearest match within a tolerance",
+   "formula": "match(p) = argmin_b |t_b − t_p| when min_b |t_b − t_p| ≤ τ, else none; matched share = |{p : match(p) exists}| / n_p",
+   "citation": "McKinney (2022)",
+   "lab": 4,
+   "function": "join_growth",
+   "check": "verify/check_04.py"
+  },
+  {
+   "id": "assemble",
+   "name": "the hand-off table and its manifest",
+   "slide": "Definition — the table this module hands to the next three",
+   "formula": "one row per (phone_id, window); mask_c = 1[x_c absent] beside x_c for every filled column c and for no other; split_point t_c = the window of the ⌊f·n⌋-th row in time order, train = {t < t_c}, test = {t ≥ t_c}; θ and the ledger stored unchanged",
+   "citation": "Huyen (2022); Kuhn & Johnson (2019), ch. 8",
+   "lab": 4,
+   "function": "assemble",
+   "check": "verify/check_04.py"
+  }
+ ]
+}

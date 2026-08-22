@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+landing/
+DATA_PROFILE.md
+.ipynb_checkpoints/
+data/*.parquet
+data/MANIFEST.json
+out/
+mlruns.db
+mlartifacts/
+mlruns/
+labs/.your_attempt/
+labs/.attempts.json
+timing.json
