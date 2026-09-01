@@ -54,7 +54,10 @@ find_leaks(frame, target), and keep_or_drop(evidence).
           means     {column: value} and stds {column: value} for scaling
           columns   the column order, so that applying is deterministic
         Return them in a dict. Anything not in that dict cannot be applied
-        later, which is the point.
+        later, which is the point. Each mean and standard deviation is taken
+        over the values actually present, before any fill -- fill the gaps
+        with a constant first, and that constant leaks into the very numbers
+        meant to describe the column before it was touched.
 
     apply_preprocessing(frame, fitted) -> frame
         Fill and scale using the stored constants and no others. Do not look at
