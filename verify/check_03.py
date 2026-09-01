@@ -328,10 +328,13 @@ def body(lab):
     # otherwise go unnoticed.
     for column in fitted["columns"]:
         close(fitted["means"][column], float(train[column].mean()), 1e-6,
-              f"means['{column}'] is not the training mean — did you fit on "
-              "everything? The test set is supposed to stand in for data the model "
-              "has never seen; a mean computed over it has already been used to "
-              "prepare the model's input.")
+              f"means['{column}'] is not mean(train[column]) with the gaps still "
+              "gaps. Two ways to get here: fitting on rows outside `train` -- the "
+              "test set is supposed to stand in for data the model has never seen, "
+              "and a mean computed over it has already been used to prepare the "
+              "model's input -- or filling the gaps with a constant before taking "
+              "the mean, which folds that constant into the very number meant to "
+              "describe the column before it was touched.")
         close(fitted["medians"][column], float(train[column].median()), 1e-6,
               f"medians['{column}'] is not the training median. It is the constant "
               "that fills every gap in this column for the rest of the model's life, "
@@ -373,6 +376,13 @@ def body(lab):
         "rows where the target is OUT and 0 on every row where it is IN — the target "
         "inverted. A column that disagrees perfectly gives the game away as completely "
         "as one that agrees perfectly, so check agreement both ways round.")
+    assert "label" in leaks, (
+        f"find_leaks() returned {leaks} and missed 'label'. It is the archive's own "
+        "hand-recorded annotation -- the shuttle's name while aboard, a fixed value "
+        "while not -- and it is filled in by exactly the same process that writes the "
+        "target, the way bus_id is. It is not hidden from the frame the way "
+        "aboard_truth is; a student who applies the 99 per cent rule to every column "
+        "finds it the same way they find bus_id.")
     assert leaks == sorted(leaks), "find_leaks() must return the names sorted"
 
     # Negative controls on the shipped frame. Until these existed, `return

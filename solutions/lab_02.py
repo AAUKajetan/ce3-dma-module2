@@ -118,8 +118,9 @@ def fills_are_biased_which_way() -> str:
 
     Any fill built from what you have — a mean, a moving average, the last value
     carried forward — is therefore made of near evidence and used to stand in for
-    a far measurement. It comes out too strong. Measured here, both methods put
-    the absent readings well over ten decibels stronger than they really were.
+    a far measurement. It comes out too strong. Measured here, the flat mean
+    invents readings well over ten decibels stronger than they really were; the
+    masked moving average does nearly as much damage, just under ten.
 
     The more useful surprise is how close the two methods are. The masked moving
     average is barely better than the flat mean, because it too is carrying
