@@ -50,14 +50,6 @@ def fit_preprocessing(train) -> dict:
     (x − mu)²) over the training rows. It is a choice, and it is printed here so
     that the check, the slide and this file grade the same number. A column that
     does not vary gets sigma = 1, so that scaling it does not divide by nought.
-
-    The median, mean and standard deviation are each taken over the training
-    values actually present, before any fill -- pandas skips a NaN in a mean or
-    a std by default, and that default is the estimate this function grades.
-    Filling the gaps with a constant first and then taking the mean or the
-    standard deviation of the filled column is a different, and wrong, order:
-    the fill's own constant would leak into the very numbers meant to describe
-    the column before it was touched.
     """
     numeric = _numeric_columns(train)
     return {
@@ -122,11 +114,6 @@ def find_leaks(frame, target: str = TARGET) -> list:
     produces the label -- which is to say, not until after the answer is already
     known. The score was never real.
 
-    `label` is filled in by that same process and belongs to the same family:
-    the archive's hand-recorded annotation, at finer grain than the target but
-    filled in exactly when the target is, whereas `aboard_truth` never reaches
-    this frame at all -- it is stripped before students ever see it.
-
     Presence is checked as well as value, because that is the form the leak
     actually takes here. A column can be almost entirely empty and still give
     the game away by *where* it is empty. Both tests use the same 99 per cent
@@ -153,7 +140,7 @@ def find_leaks(frame, target: str = TARGET) -> list:
 
     leaks = []
     for column in frame.columns:
-        if column in (target, "aboard_truth"):
+        if column in (target, "label", "aboard_truth"):
             continue
         series = frame.loc[known, column]
 

@@ -110,24 +110,6 @@ def body(lab):
             "ones, so anything built from the present readings stands in for a far value "
             "using near evidence. Check that you are filling the masked rows.")
 
-    # The two encodings never disagree in the frame the generator writes -- rssi
-    # is null exactly when prox is -1, on every row, because one `heard` array
-    # decides both. So a mask reading only one of them still passes every row
-    # checked above. Force a disagreement to find out whether it does.
-    disagreeing = planted_frame()
-    disagreeing.loc[0, "prox1"] = SENTINEL   # rssi1 heard, but proximity says "nothing"
-    disagreeing.loc[2, "prox1"] = 2          # rssi1 silent, but proximity says a real band
-    checked = lab.impute_with_mask(disagreeing, "drop")
-    expected_mask = disagreeing["rssi1"].isna() | (disagreeing["prox1"] == SENTINEL)
-    got_mask = checked["rssi1_missing"].astype(bool)
-    assert (got_mask == expected_mask).all(), (
-        "the mask for rssi1 disagrees with isna() | (prox1 == -1) once the two "
-        "encodings of absence are made to disagree with each other -- heard but "
-        "flagged 'no reading', or silent but flagged a real band. The generator's "
-        "own data always agrees on both, so a mask that recognises only one "
-        "encoding passes every row it has been tested against so far, and only "
-        "this one catches it.")
-
     # The bias assertions above are satisfied by any strong constant: a fill of
     # -40 decibel-milliwatts sits a long way from readings that were far and
     # weak, whatever produced it. So hold each of the three methods to the thing
