@@ -47,10 +47,13 @@ def main():
         # Two tests, not one. "Different from the solution I am about to apply"
         # is not the same as "this is the student's own work": edit a solution
         # while a previously applied one is still in labs/, and the old solution
-        # gets written over the backup, destroying it silently. A file with no
-        # NotSolved raise left in it is a solution, never an attempt.
+        # gets written over the backup, destroying it silently. The first cut of
+        # this fix tested for the substring "NotSolved", which every solution
+        # also carries in its own import line -- so the file it was meant to
+        # protect against was exactly the one that defeated it. A file with no
+        # `raise NotSolved` left in it is a solution, never an attempt.
         current = lab.read_text()
-        if current.strip() != source.strip() and "NotSolved" in current:
+        if current.strip() != source.strip() and "raise NotSolved" in current:
             shutil.copy2(lab, BACKUP / lab_name)
         # The solutions import nothing from lab_support, so the stub's path
         # preamble is not needed -- but the check imports by file name, so the
