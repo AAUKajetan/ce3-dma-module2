@@ -98,6 +98,18 @@ AGREEMENT = 0.99      # the leak threshold: agreement or purity of at least 99 p
 MAX_LEAK_VALUES = 10  # the purity test only means anything over at most this many values
 DDOF = 0              # population standard deviation, stated once and used everywhere
 
+# The three choices in the verdict. They are printed here, on the definition
+# slide and in the check's own header, and nowhere else -- not in the stub,
+# because a rule a student copies out of the file they are filling in has been
+# transcribed rather than understood.
+MEMORISED_GAP = 0.25       # in sample minus out of sample, above which it is memory
+MASK_MISSING_SHARE = 0.20  # absent on this share of the rows or more: keep the mask too
+PURITY_FLOOR = 0.60        # at or below this, and complete, it carries nothing
+CALLS = ("keep", "keep with the mask", "drop")
+
+
+def _numeric_columns(frame) -> list:
+    return [c for c in frame.select_dtypes("number").columns]
 
 def fit_preprocessing(train) -> dict:
     """Learn the constants from the training rows, and store them.
@@ -114,9 +126,13 @@ def fit_preprocessing(train) -> dict:
     Returns:
         {"medians": {...}, "means": {...}, "stds": {...}, "columns": [...]}.
     """
-    # TODO: compute medians, means, stds and the column order. Train only.
-    raise NotSolved("fit_preprocessing(train) still raises instead of returning constants")
-
+    numeric_list = _numeric_columns(train)
+    return {
+        "medians": {c: float(train[c].median()) for c in numeric_list},
+        "means": {c: float(train[c].mean()) for c in numeric_list},
+        "stds": {c: float(train[c].std(ddof=DDOF)) or 1.0 for c in numeric_list},
+        "columns": list(numeric_list),
+    }
 
 def apply_preprocessing(frame, fitted: dict):
     """Apply the stored constants. Do not recompute anything from `frame`.
@@ -134,85 +150,228 @@ def apply_preprocessing(frame, fitted: dict):
     Returns:
         A frame with the stored columns, in the stored order.
     """
-    # TODO: fill and scale using `fitted`, and return the stored column order.
-    raise NotSolved("apply_preprocessing(frame, fitted) still raises instead of returning a frame")
+    output_df = pd.DataFrame(index=frame.index)
+    for column in fitted["columns"]:
+        values_series = frame[column] if column in frame.columns else np.nan
+        values_series = pd.Series(values_series, index=frame.index, dtype="float64")
+        values_series = values_series.fillna(fitted["medians"][column])
+        output_df[column] = ((values_series - fitted["means"][column])
+                             / fitted["stds"][column])
+    return output_df[fitted["columns"]]
+
+
+def column_purity(series, positive) -> float:
+    """Σ_v max_y n(v, y) / n — one statistic, used by the detector and the verdict.
+
+    The share of rows that a rule which answers with the commonest target value
+    seen at each value of the column would get right. It is written once, here,
+    because `find_leaks` measures it to raise a suspicion and `keep_or_drop` is
+    handed it to settle one, and a course in which those were two slightly
+    different numbers would be teaching the wrong lesson twice.
+
+    Read it with its ceiling or not at all: a value that sees exactly one row is
+    pure whatever the target does, so purity rises towards one with the number
+    of distinct values for reasons that have nothing to do with the target.
+    """
+    known_series = series.notna()
+    if known_series.sum() == 0:
+        return float("nan")
+    table_df = pd.crosstab(series[known_series], positive[known_series])
+    if table_df.empty:
+        return float("nan")
+    return float(table_df.max(axis=1).sum() / table_df.to_numpy().sum())
 
 
 def find_leaks(frame, target: str = TARGET) -> list:
     """Columns that agree with the target almost perfectly, by value or by presence.
 
-    Definition graded by the check:
-        column c leaks when agreement(c) ≥ 0.99, or purity(c) ≥ 0.99 with
-        |values(c)| ≤ 10, where agreement(c) = max( mean(1[c present] = 1[Y =
-        IN]), mean(1[c present] ≠ 1[Y = IN]) ) and purity(c) = Σ_v max_y n(v, y)
-        / n
-        (Kaufman et al., 2012; Kapoor & Narayanan, 2023). n(v, y) is the number
-        of labelled rows where the column holds v and the target holds y; the
-        threshold 0.99 is AGREEMENT above and the ceiling on the distinct values
-        is MAX_LEAK_VALUES. The ceiling is part of the rule, not a tidying-up:
-        purity is one by construction for a column whose values are all
-        distinct, so without it every identifier in the file is a perfect leak
-        for a reason that has nothing to do with the target. Presence is tested
-        as well as value, because that is the form the leak takes here, and both
-        directions count: a column that disagrees perfectly gives the game away
-        as completely as one that agrees perfectly. Slide: "Definition — target
-        leakage, and the rule that catches it here".
-    Needs: pandas, sorted, set
+    `bus_id` is the one to find, and it is worth saying exactly why it is so
+    dangerous: it is not correlated with the target, it *is* the target. It is
+    filled in when and only when the passenger is aboard. In the archive that is
+    7,723 rows aboard all carrying it and 6,000 rows not aboard all lacking it,
+    with no exceptions in either direction.
 
-    Returns:
-        The leaking column names, sorted.
+    A model given this column achieves near-perfect accuracy, ships, and then
+    meets live data where the field is populated by the same process that
+    produces the label -- which is to say, not until after the answer is already
+    known. The score was never real.
+
+    `label` is filled in by that same process and belongs to the same family:
+    the archive's hand-recorded annotation, at finer grain than the target but
+    filled in exactly when the target is, whereas `aboard_truth` never reaches
+    this frame at all -- it is stripped before students ever see it.
+
+    Presence is checked as well as value, because that is the form the leak
+    actually takes here. A column can be almost entirely empty and still give
+    the game away by *where* it is empty. Both tests use the same 99 per cent
+    rule: presence agreeing (or disagreeing) with the target on at least 99 per
+    cent of labelled rows, or a value purity -- the sum over values of the larger
+    class count, divided by the rows -- of at least 99 per cent.
+
+    The ceiling on the distinct values is part of the definition rather than an
+    implementation detail, and it is the part students leave out. Purity is one
+    by construction for any column whose values are all distinct: each value
+    then sees exactly one row, so the larger class count for that value is one,
+    the sum is the number of rows, and the ratio is one whatever the target
+    does. Leave the ceiling out and the detector reports every row identifier,
+    every timestamp and every free-text field in the file as a perfect leak --
+    and a detector that reports everything is one nobody reads. MAX_LEAK_VALUES
+    is that ceiling, and it is a choice, printed here, on the slide and in the
+    check.
     """
-    # TODO: check each column, by value and by presence. Return sorted names.
-    raise NotSolved("find_leaks(frame, target) still raises instead of returning a list")
+    labels_series = frame[target]
+    known_series = labels_series.notna()
+    if known_series.sum() == 0:
+        return []
+    positive_series = labels_series[known_series] == "IN"
+
+    leaks_list = []
+    for column in frame.columns:
+        if column in (target, "aboard_truth"):
+            continue
+        series = frame.loc[known_series, column]
+
+        # Leak by presence: is the column filled in exactly when the target is?
+        present_series = series.notna()
+        if present_series.nunique() > 1:
+            agreement_value = max((present_series == positive_series).mean(),
+                                  (present_series != positive_series).mean())
+            if agreement_value >= AGREEMENT:
+                leaks_list.append(column)
+                continue
+
+        # Leak by value: does a single value split the target almost perfectly?
+        # The cardinality ceiling is the guard described above: without it a
+        # column of distinct values is pure by construction and always "leaks".
+        if series.nunique(dropna=True) <= MAX_LEAK_VALUES and series.notna().any():
+            if column_purity(series, positive_series) >= AGREEMENT:
+                leaks_list.append(column)
+
+    return sorted(set(leaks_list))
+
+
+
+def _said(value) -> str:
+    """One evidence value, written so that the check can find it again.
+
+    Four significant figures, because the check matches every number in the
+    reason against the evidence to within half a per cent: round harder and a
+    true sentence is rejected for a rounding error.
+    """
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    if isinstance(value, int):
+        return f"{value}"
+    return f"{float(value):.4g}"
 
 
 def keep_or_drop(evidence: dict) -> tuple:
     """The call on one candidate feature, and the reason for it.
 
-    Definition graded by the check:
-        verdict: E → {keep, keep with the mask, drop}, a total function of the
-        six measured quantities alone, with reason ⊆ E: every number in the
-        reason is a value in E
-        (Kaufman et al., 2012; Kapoor & Narayanan, 2023). E is `evidence`, whose
-        six keys are listed below. The order in which they are asked, and the
-        choice printed beside each, are on the slide "Definition — the verdict
-        on a candidate feature" and nowhere in this file: a verdict you can copy
-        off the page you are writing on is not a verdict.
-    Needs: dict, float, str
+    Three calls, five questions, and the first question that answers decides.
+    The order is the whole of the method, and it is the part students get wrong:
+    they start with "is it any good?", which is the fourth question at best.
 
-    `evidence` holds one candidate feature's numbers, every one of them measured
-    by you earlier in this module:
+    1. **Is it knowable at the moment of prediction?** If not, drop it, however
+       good it looks -- and it will look wonderful, because a column filled in
+       by the same process that produces the target agrees with the target
+       perfectly. `bus_id` here is pure and has no in-sample gap at all: the
+       model trained on it is not overfitting, it is reading the answer. There
+       is no threshold to argue about in this question, and that is why it is
+       first.
 
-        missing_share                  rows with no value, as a share of the rows
-        imputation_bias_db             the mean of (fill − truth) over the rows
-                                       the fill touched, in decibels, as Lab 2
-                                       measured it; nought when nothing is filled
-        purity                         Σ_v max_y n(v, y) / n on the training
-                                       rows: the share of rows a rule answering
-                                       with the commonest target value seen at
-                                       each value of this column would get
-                                       right. The same statistic find_leaks
-                                       measures, and it has the same ceiling on
-                                       it for the same reason
-        cardinality                    how many distinct values the column holds
-        knowable_at_decision_time      True when the value already exists at the
-                                       instant the model has to answer
-        in_sample_minus_out_of_sample  the score on the rows it was fitted on,
-                                       minus the score on the rows it was not
+    2. **Does it leak by value?** Purity of AGREEMENT or more, over at most
+       MAX_LEAK_VALUES distinct values -- the same rule, with the same two
+       constants, that find_leaks uses, so the detector and the verdict cannot
+       disagree about what a column's purity means. `stationary` is caught here
+       and nowhere else: it is knowable, it is complete and it generalises, and
+       it is still the target inverted.
 
-    Returns:
-        (call, reason).
-        `call` is exactly one of "keep", "keep with the mask", "drop".
-        `reason` is a sentence somebody who was not in the room can disagree
-        with. It names at least two of the six quantities and quotes their
-        values, and every number in it has to be one of those values — a number
-        that came from a slide, a paper or a memory is rejected, which is the
-        habit this course exists to break.
+       **The ceiling is half the rule, and this is where it earns its place.**
+       Purity is one by construction for a column whose values are all distinct,
+       and all but one for a column that is nearly all distinct, because a value
+       that sees one row is pure whatever the target does. So a high purity over
+       a wide column is arithmetic, not evidence, and this question must not
+       fire on it. `phone_speed` -- Lab 4's own window mean, 1,415 distinct
+       values over 1,500 training windows, purity 0.9933 -- is the strongest
+       honest feature in the hand-off table, and a rule without the ceiling
+       throws it away.
+
+    3. **Does the fit survive the split?** A feature that scores MEMORISED_GAP
+       or more better on the rows it was fitted on than on the rows it was not
+       has been memorised rather than learned. This is what condemns a row
+       counter, and it has to be, because question two cannot: one value per
+       row, a perfect in-sample fit, and nothing out of sample.
+
+    4. **Is it absent often enough that the fill invents?** At or above
+       MASK_MISSING_SHARE of the rows, keep it *with its mask*. Lab 2 measured
+       what the fill invents -- nine decibels for the masked moving average,
+       nearly fourteen for the mean -- and the mask is the only honest record of
+       which rows carry an invention. Dropping the mask and keeping the value is
+       the common error, and it is the one that cannot be detected downstream.
+
+    5. **Does it beat the base rate?** A purity of PURITY_FLOOR or less on a
+       column that is complete carries nothing, and a column carrying nothing
+       costs time, columns and trust. Note the "and complete": a mostly absent
+       column whose *values* say nothing may still be worth keeping, because its
+       *absence* says something. That is the whole of Lab 2 in one clause, and
+       it is why question four comes before question five.
+
+    Otherwise keep it as it is.
+
+    The reason is not decoration. A call is one of three strings, so on its own
+    it is very nearly a coin flip; the reason is what makes it an argument, and
+    the check refuses any number in it that is not one of the numbers handed
+    over. Quote what you measured, name what you compared it against.
     """
-    # TODO: ask the six in the order the slide gives, and build the reason from
-    # `evidence` -- not from anything you remember.
-    raise NotSolved("keep_or_drop(evidence) still raises instead of returning a call and a reason")
+    missing = float(evidence["missing_share"])
+    bias = float(evidence["imputation_bias_db"])
+    purity = float(evidence["purity"])
+    values = int(evidence["cardinality"])
+    knowable = bool(evidence["knowable_at_decision_time"])
+    gap = float(evidence["in_sample_minus_out_of_sample"])
 
+    if not knowable:
+        return "drop", (
+            f"knowable at decision time is no, so the call is settled before anything "
+            f"else is weighed: a purity of {_said(purity)} and an in sample minus out "
+            f"of sample gap of {_said(gap)} describe a column that will not exist when "
+            f"the model has to answer.")
+
+    if purity >= AGREEMENT and values <= MAX_LEAK_VALUES:
+        return "drop", (
+            f"purity is {_said(purity)} over {_said(values)} distinct values, so this "
+            f"is not the arithmetic that makes a wide column look pure — a rule with "
+            f"that few branches reads the target off this column almost exactly, and "
+            f"an in sample minus out of sample gap of {_said(gap)} says it will keep "
+            f"doing so right up to the day the column is not there.")
+
+    if gap >= MEMORISED_GAP:
+        return "drop", (
+            f"in sample minus out of sample is {_said(gap)}, and with {_said(values)} "
+            f"distinct values the model has somewhere to put every single row; a purity "
+            f"of {_said(purity)} on a column that wide is arithmetic rather than "
+            f"evidence, and it does not survive the split.")
+
+    if missing >= MASK_MISSING_SHARE:
+        return "keep with the mask", (
+            f"missing share is {_said(missing)}, so most of this column would be "
+            f"invented by the fill, and the imputation bias, in db, is {_said(bias)} "
+            f"decibels of signal that was never recorded; the value is worth keeping at "
+            f"a purity of {_said(purity)} only if the mask that says which rows were "
+            f"invented travels beside it.")
+
+    if purity <= PURITY_FLOOR:
+        return "drop", (
+            f"purity is {_said(purity)}, no better than answering with the majority, "
+            f"and missing share is {_said(missing)}, so there is no absence for a mask "
+            f"to carry either; the column costs a column and buys nothing.")
+
+    return "keep", (
+        f"purity is {_said(purity)} but it is spread over {_said(values)} distinct "
+        f"values, which is why that number is arithmetic and not a confession; missing "
+        f"share is {_said(missing)}, so nothing is invented, and in sample minus out of "
+        f"sample is {_said(gap)}, so what it buys survives the split.")
 
 if __name__ == "__main__":
     say = narrator(LAB)

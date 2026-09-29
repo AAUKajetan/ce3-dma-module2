@@ -121,63 +121,156 @@ from lab_support import (NotSolved, load_bus, load_phones, load_simpson,   # noq
 from _narrate import narrator, show_table, save_figure                  # noqa: E402,F401
 
 LAB = 1
-
+SIMPSON = "Simpson's paradox"
 
 def align(bus, phones, grain_seconds: int = 5):
     """Put two sources on one grain, and account for every row.
 
-    Definition graded by the check:
-        w_j = [t_0 + j·Δ, t_0 + (j+1)·Δ), Δ = 5 s, t_0 = 00:00:00 in coordinated
-        universal time, from utc_time
-        (Akidau et al., 2015). Δ is `grain_seconds`; flooring a timestamp to the
-        grain computes j. Slide: "Definition — a tumbling window on the
-        coordinated universal time grain".
-        used + dropped = received, with Σ_reason drop_reasons[reason] = dropped
-        (Wang & Strong, 1996). Every phone row you were handed is either used or
-        dropped with a reason; nothing is both and nothing is neither. Slide:
-        "Definition — the conservation ledger".
-        breaches(X, P) = the complaints P makes about X, over presence, type,
-        range, tolerated absence and sampling step, in that order; X arrives fit
-        for use exactly when breaches(X, P) is empty
-        (Wang & Strong, 1996; Module 1's `declare_profile` writes P). P is the
-        profile Module 1 handed over, `load_module1_profile()`; run
-        `check_against(bus, P)` before you align anything and put the answer in
-        the ledger, because a complaint that is not recorded on arrival is a
-        complaint that will be argued about later. Slide: "Definition — the
-        upstream profile, and checking a frame against it".
-    Needs: pandas, len, load_module1_profile, check_against
+    The three decisions, made explicitly rather than by accident:
 
-    Returns:
-        (aligned, ledger) -- see the module docstring for both shapes.
+    1. **Which clock.** Both frames carry a column named `timestamp` that is
+       local time and a column that is coordinated universal time. In January
+       Copenhagen is one hour ahead, so using the friendly-looking name puts the
+       two sources an hour apart -- and nothing complains, because both columns
+       parse and both look like times. Always join on the coordinated column.
+
+    2. **The grain.** Five seconds is a choice, not a fact. The vehicle reports
+       twice a second and the phones once, so any common grain throws some
+       resolution away; a coarser one throws away more and matches more. The
+       ledger records which was used, because every downstream number depends
+       on it. Tumbling windows w_j = [t_0 + j·Δ, t_0 + (j+1)·Δ), Δ the grain,
+       t_0 midnight in coordinated universal time -- which is what flooring a
+       timestamp to the grain computes.
+
+    3. **What happens to the leftovers.** A phone row in a window with no
+       vehicle reading has nowhere to go. Dropping it silently is how a table
+       comes to describe a day that did not happen, so it is counted and given
+       a reason. The check adds the buckets up and insists they balance:
+       used + dropped = received, and the reasons sum to dropped.
     """
-    # TODO: run `bus` against Module 1's profile first, then parse the right time
-    # column, build the windows, join, and keep the books.
+    grain = f"{grain_seconds}s"
+
+    # Before anything is joined: what does the module upstream say about the
+    # frame that just arrived? Module 1 declared this table's columns, their
+    # ranges, the absence each one tolerates and the rate it reports at, and
+    # `check_against` is Module 1's own function applied to what we were handed.
+    #
+    # Recording the answer is the point, not passing it. An empty list is a
+    # measurement too: it says the frame arrived as promised, and it is the
+    # sentence that makes the non-empty case worth anything. Note what happens
+    # on the whole slice against one day of it -- the pooled frame satisfies the
+    # declaration and the first day alone does not, which is the same shape as
+    # the paradox in the other half of this lab.
+    breaches = check_against(bus, load_module1_profile())
+
+    bus = bus.copy()
+    bus["_t"] = pd.to_datetime(bus["utc_time"], utc=True)
+    bus["window"] = bus["_t"].dt.floor(grain)
+    per_window_bus = bus.groupby("window").agg(
+        bus_speed=("speed", "mean"),
+        bus_payload=("payload", "mean"),
+        bus_readings=("speed", "size"),
+    )
+
+    phones = phones.copy()
+    phones["_t"] = pd.to_datetime(phones["timestamp_utc"], utc=True, errors="coerce")
+
+    # Reason one: a row whose clock will not parse cannot be placed in time.
+    unparseable = int(phones["_t"].isna().sum())
+    phones = phones.dropna(subset=["_t"])
+    phones["window"] = phones["_t"].dt.floor(grain)
+
+    per_window_phone = phones.groupby(["phone_id", "window"]).agg(
+        phone_readings=("speed", "size"),
+        phone_speed=("speed", "mean"),
+        rssi1=("rssi1", "mean"),
+        rssi2=("rssi2", "mean"),
+        aboard=("label2", lambda values: (values == "IN").mean()),
+    ).reset_index()
+
+    aligned = per_window_phone.merge(
+        per_window_bus, left_on="window", right_index=True, how="inner")
+
+    # Reason two: a window with no vehicle reading at all. The inner join above
+    # removed those rows, so they are counted here rather than lost.
+    kept_windows = set(zip(aligned["phone_id"], aligned["window"]))
+    used = int(per_window_phone.apply(
+        lambda row: (row["phone_id"], row["window"]) in kept_windows, axis=1)
+        .mul(per_window_phone["phone_readings"]).sum())
+
+    dropped_no_vehicle = int(per_window_phone["phone_readings"].sum() - used)
+
+    ledger = {
+        "grain_seconds": grain_seconds,
+        "bus_rows_in": int(len(bus)),
+        "phone_rows_in": int(len(phones) + unparseable),
+        "windows_out": int(len(aligned)),
+        "phone_rows_used": used,
+        "phone_rows_dropped": dropped_no_vehicle + unparseable,
+        "drop_reasons": {
+            "timestamp would not parse": unparseable,
+            "no vehicle reading in the window": dropped_no_vehicle,
+        },
+        "profile_breaches": breaches,
+    }
+    return aligned.reset_index(drop=True), ledger
+
+
+    
     raise NotSolved("align(bus, phones, grain_seconds) still raises instead of returning a table")
 
-
 def pooled_versus_by_group(frame, outcome: str, group: str, day: str) -> dict:
-    """Compare the two days pooled, and inside each group, and say whether they disagree.
+    """The two-day comparison, pooled and inside each group -- and whether they disagree.
 
-    Definition graded by the check:
-        P(Y|D=1) > P(Y|D=0) while P(Y|D=1,G=g) < P(Y|D=0,G=g) for every group g
-        (Simpson, 1951; the name is Blyth's, 1972; the causal reading is Pearl's,
-        2014). Here Y is `outcome` (aboard), D is `day` and G is `group` (the
-        shuttle ridden). The reversal needs every group to move, and to move
-        against the pool. Slide: "Definition — Simpson's paradox".
-    Needs: pandas, numpy
+    Before you compare two days you have to know what each day is made of. The
+    archive's two days are not the same fleet: two shuttles ran on 22 January
+    and one on 23 January, so a pooled comparison of the days is partly a
+    comparison of shuttles. In the generated phones the same thing is planted on
+    purpose: the second day has fewer volunteers and most of them rode the
+    shuttle whose riders spend the smaller share of their time aboard.
 
-    Returns a dict with:
-        days      the two values of `day`, sorted, earlier first
-        pooled    the later day's share of `outcome` minus the earlier day's,
-                  over the whole frame. A share, so 0.05 is five points.
-        by_group  the same difference inside each value of `group`
-        shares    {group or "pooled": {day: share}}, for a figure
-        reversal  True when every group moves against the pooled direction
-        name      what that is called, when it is one, else None
+    So the aboard share *rises* on each shuttle and *falls* pooled. Both numbers
+    are correct; they answer different questions. When the sign inside every
+    group is the opposite of the pooled sign, that is Simpson's paradox
+    (Simpson, 1951; the name is Blyth's, 1972), and the honest report says which
+    comparison you made -- Pearl (2014) is the reading on which one to trust,
+    and the answer depends on what caused the mix to change.
+
+    Returns a dict with `days` (the two day values, sorted), `pooled` (the
+    later day's share minus the earlier day's, pooled), `by_group` (the same
+    difference inside each group), `shares` (the shares themselves, for a
+    figure), `reversal` (True when every group moves against the pool) and
+    `name` (Simpson's paradox when it is one, else None). Differences are in
+    shares, so 0.05 is five percentage points.
     """
-    # TODO: shares by day pooled and by group, the two differences, then the verdict.
-    raise NotSolved("pooled_versus_by_group(frame, outcome, group, day) still raises "
-                    "instead of returning the two comparisons")
+    days = sorted(pd.unique(frame[day]))
+    assert len(days) == 2, f"expected two values of {day!r}, found {len(days)}"
+    earlier, later = days
+    aboard = frame[outcome].astype(bool)
+
+    def share(rows) -> float:
+        return float(aboard[rows].mean()) if rows.any() else float("nan")
+
+    on_day = {d: frame[day] == d for d in days}
+    shares = {"pooled": {d: share(on_day[d]) for d in days}}
+    for g in sorted(pd.unique(frame[group])):
+        shares[g] = {d: share(on_day[d] & (frame[group] == g)) for d in days}
+
+    pooled = shares["pooled"][later] - shares["pooled"][earlier]
+    by_group = {g: shares[g][later] - shares[g][earlier]
+                for g in shares if g != "pooled"}
+
+    # A reversal needs every group to move, and to move against the pool. A
+    # group that did not move, or was absent on one day, settles nothing.
+    moves = [d for d in by_group.values() if not np.isnan(d)]
+    reversal = bool(
+        pooled != 0 and len(moves) == len(by_group) and moves
+        and all(d != 0 and np.sign(d) == -np.sign(pooled) for d in moves))
+
+    return {"days": (earlier, later), "pooled": pooled, "by_group": by_group,
+            "shares": shares, "reversal": reversal,
+            "name": SIMPSON if reversal else None}
+
 
 
 if __name__ == "__main__":

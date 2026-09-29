@@ -88,6 +88,41 @@ SENTINEL = -1
 SMOOTHING = 0.3   # alpha, the weight of the newest heard reading -- a stated choice
 
 
+
+def _missing(frame, beacon: str) -> pd.Series:
+    """Absent, however it was written down: m_t = 1 when rssi is null or prox is −1.
+
+    The archive encodes the same absence twice: the signal strength is empty and
+    the proximity column holds -1, on exactly the same rows, for every beacon.
+    Recognise only the empty one and every mean you take over the proximity
+    column averages in -1 as though a phone had been at proximity band minus
+    one, which is not a place.
+    """
+    absent = frame[beacon].isna()
+    proximity = PROXIMITY[beacon]
+    if proximity in frame.columns:
+        absent = absent | (frame[proximity] == SENTINEL)
+    return absent
+
+
+def _ema_masked(values: pd.Series, series_id) -> pd.Series:
+    """s_t = α·x_t + (1−α)·s_{t−1} over the heard readings, carried across gaps.
+
+    One series per phone, in the frame's row order (time order): a gap in one
+    volunteer's trace is filled from that volunteer's last heard readings, not
+    from whoever happened to report in the row above. `adjust=False` is the
+    plain recursion the slide states; `ignore_na=True` skips the gaps rather
+    than letting them dilute the weights, and at a gap the mean is simply the
+    last state, which is what "carried forward" means (Servizi et al., 2023).
+    """
+    def recursion(x: pd.Series) -> pd.Series:
+        return x.ewm(alpha=SMOOTHING, adjust=False, ignore_na=True).mean()
+
+    if series_id is None:
+        return recursion(values)
+    return values.groupby(series_id, sort=False).transform(recursion)
+
+
 def impute_with_mask(frame, method: str = "ema_masked"):
     """Fill the absent beacon readings, and keep a record that you did.
 
@@ -113,9 +148,31 @@ def impute_with_mask(frame, method: str = "ema_masked"):
     Returns:
         A copy with <beacon>_filled and <beacon>_missing for each beacon.
     """
-    # TODO: recognise both encodings of absence, build the mask, then fill.
-    raise NotSolved("impute_with_mask(frame, method) still raises instead of returning a frame")
+    filled_frame = frame.copy()
+    series_id = frame["phone_id"] if "phone_id" in frame.columns else None
 
+    for beacon in BEACONS:
+        absent = _missing(frame, beacon)
+        values = frame[beacon].where(~absent)
+
+        if method == "drop":
+            filled = values                       # leave the gaps as gaps
+        elif method == "mean":
+            filled = values.fillna(values.mean())  # x̄ over the heard readings
+        elif method == "ema_masked":
+            # It does not pretend the phone was near the beacon; it holds the
+            # last thing it knew about that phone. Heard rows keep their value.
+            filled = values.fillna(_ema_masked(values, series_id))
+        else:
+            raise ValueError(f"unknown method {method!r}")
+
+        filled_frame[f"{beacon}_filled"] = filled
+        filled_frame[f"{beacon}_missing"] = absent
+
+    return filled_frame
+
+
+    
 
 def imputation_bias(filled, truth, missing) -> float:
     """How far the values you invented sit from what was really there, in decibels.
@@ -137,10 +194,14 @@ def imputation_bias(filled, truth, missing) -> float:
     Returns:
         The mean of (fill − truth) over the filled rows, in decibels; 0.0 when
         the method filled nothing.
-    """
-    # TODO: the rows that were masked AND filled, then the mean of the difference.
-    raise NotSolved("imputation_bias(filled, truth, missing) still raises instead of "
-                    "returning a number")
+"""
+    filled = pd.Series(filled, dtype="float64").reset_index(drop=True)
+    truth = pd.Series(truth, dtype="float64").reset_index(drop=True)
+    missing = pd.Series(missing).astype(bool).reset_index(drop=True)
+    touched = missing & filled.notna() & truth.notna()
+    if not touched.any():
+        return 0.0
+    return float((filled[touched] - truth[touched]).mean())
 
 
 def fills_are_biased_which_way() -> str:
@@ -160,10 +221,7 @@ def fills_are_biased_which_way() -> str:
     the far ones. What does filling them with the average of the near ones do to
     the distribution?
     """
-    # TODO: return "too strong" or "too weak".
-    raise NotSolved("fills_are_biased_which_way() still raises instead of returning "
-                    "a direction")
-
+    return "too strong"
 
 if __name__ == "__main__":
     say = narrator(LAB)
